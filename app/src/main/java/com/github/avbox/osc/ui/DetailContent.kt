@@ -35,6 +35,7 @@ import com.github.avbox.osc.R
 import com.github.avbox.osc.api.ApiConfig
 import com.github.avbox.osc.data.FollowDays
 import com.github.avbox.osc.ui.components.FollowReminderSheet
+import com.github.avbox.osc.ui.player.PlayContainer
 
 internal val HeroScrollFadeDistance = 300.dp
 
@@ -50,6 +51,9 @@ internal fun DetailContent(
     activity: DetailActivity,
     vm: DetailViewModel,
     listState: LazyListState,
+    inlinePlayback: Boolean,
+    playerContainer: PlayContainer?,
+    onEnterFullscreen: () -> Unit,
     onPosterPic: (String) -> Unit,
     onSeed: (Int?) -> Unit,
 ) {
@@ -88,6 +92,9 @@ internal fun DetailContent(
                 followed = followRecord != null,
                 onPosterPic = onPosterPic,
                 onSeed = onSeed,
+                inlinePlayback = inlinePlayback,
+                playerContainer = playerContainer,
+                onEnterFullscreen = onEnterFullscreen,
                 onBack = { activity.onBackPressedDispatcher.onBackPressed() },
                 onPlay = { vm.onPlayRequested(DetailPlaybackEntry.PlayCapsule) },
                 onMusic = { activity.openMusicPlayer() },

@@ -87,6 +87,7 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
     val menuContext = LocalContext.current
     val pageState by vm.pageState.collectAsState()
     val full by vm.fullScreen.collectAsState()
+    val inlinePlayback by vm.inlinePlayback.collectAsState()
     val rotating by vm.rotating.collectAsState()
     val playSignal by vm.playSignal.collectAsState()
     val enteringFullscreen by vm.enteringFullscreen.collectAsState()
@@ -122,6 +123,7 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
     val isLandscapeNow = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val fullBox = DetailFullScreenFrame.fullBox(rotating, full, isLandscapeNow)
     val inTransition = enteringFullscreen || exitingFullscreen
+    val inlinePreview = inlinePlayback && !fullBox && !inTransition
     var slideWidthPx by remember { mutableFloatStateOf(0f) }
 
     val container = activity.playContainer
@@ -251,31 +253,35 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
         ) {
             if (flatHero) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
-                        val info = vm.vodInfo
-                        if (info != null) {
-                            DetailHeroPoster(
-                                vm = vm,
-                                title = info.name ?: "TVBox",
-                                altTitle = info.en,
-                                picture = info.pic,
-                                year = info.year,
-                                onImage = { image ->
-                                    scope.launch {
-                                        val seed = withContext(Dispatchers.Default) { ImagePalette.seedOf(image) }
-                                        if (seed != null && backdropSeed == null) backdropSeed = seed
-                                    }
-                                },
-                                onBackdropPic = { backdropPic = it },
-                                paused = full,
-                                modifier = Modifier.fillMaxSize(),
+                    if (inlinePreview && container != null) {
+                        DetailInlinePlayer(container, Modifier.fillMaxSize())
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().layerBackdrop(pageBackdrop)) {
+                            val info = vm.vodInfo
+                            if (info != null) {
+                                DetailHeroPoster(
+                                    vm = vm,
+                                    title = info.name ?: "TVBox",
+                                    altTitle = info.en,
+                                    picture = info.pic,
+                                    year = info.year,
+                                    onImage = { image ->
+                                        scope.launch {
+                                            val seed = withContext(Dispatchers.Default) { ImagePalette.seedOf(image) }
+                                            if (seed != null && backdropSeed == null) backdropSeed = seed
+                                        }
+                                    },
+                                    onBackdropPic = { backdropPic = it },
+                                    paused = full,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.verticalGradient(*FlatPageScrimStops)),
                             )
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Brush.verticalGradient(*FlatPageScrimStops)),
-                        )
                     }
                     FlatScrollScrim(progress = { heroProgress })
                 }
@@ -325,6 +331,11 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                                     activity = activity,
                                     vm = vm,
                                     listState = listState,
+                                    inlinePlayback = inlinePreview,
+                                    playerContainer = container,
+                                    onEnterFullscreen = {
+                                        vm.onFullScreenToggleRequested(true, activity.playbackFacts())
+                                    },
                                     onPosterPic = { backdropPic = it },
                                     onSeed = { argb -> if (argb != null) backdropSeed = argb },
                                 )
@@ -341,7 +352,7 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
             }
 
             val playerContainer = container
-            if (playerContainer != null) {
+            if (playerContainer != null && (fullBox || inTransition)) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

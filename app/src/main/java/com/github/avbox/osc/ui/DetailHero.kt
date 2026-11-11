@@ -72,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -82,6 +83,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.github.avbox.osc.R
 import com.github.avbox.osc.ui.player.PLAYER_PRESS_SCALE
+import com.github.avbox.osc.ui.player.PlayContainer
 import com.github.avbox.osc.ui.player.playerPressEffect
 import com.github.avbox.osc.ui.components.HeroImageSizes
 import com.github.avbox.osc.ui.components.ImagePalette
@@ -211,6 +213,9 @@ internal fun DetailHero(
     followed: Boolean,
     onPosterPic: (String) -> Unit,
     onSeed: (Int?) -> Unit,
+    inlinePlayback: Boolean,
+    playerContainer: PlayContainer?,
+    onEnterFullscreen: () -> Unit,
     onBack: () -> Unit,
     onPlay: () -> Unit,
     onMusic: () -> Unit,
@@ -263,6 +268,8 @@ internal fun DetailHero(
                 collected = collected,
                 onBack = onBack,
                 onCollect = onCollect,
+                inlinePlayback = inlinePlayback && playerContainer != null,
+                onEnterFullscreen = onEnterFullscreen,
                 fallbackColor = circleColor,
             )
             Column(
@@ -311,39 +318,46 @@ internal fun DetailHero(
                 .height(imageHeight)
                 .clipToBounds(),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                *DetailHeroFadeStops
-                                    .map { (position, alpha) -> position to Color.White.copy(alpha = 1f - alpha) }
-                                    .toTypedArray(),
-                            ),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    },
-            ) {
-                Box(modifier = Modifier.fillMaxSize().layerBackdrop(glassBackdrop)) {
-                    DetailHeroPoster(
-                        vm = vm,
-                        title = title,
-                        altTitle = altTitle,
-                        picture = picture,
-                        year = year,
-                        onImage = { image ->
-                            scope.launch {
-                                val seed = withContext(Dispatchers.Default) { ImagePalette.seedOf(image) }
-                                onSeed(seed)
-                            }
+            if (inlinePlayback && playerContainer != null) {
+                DetailInlinePlayer(
+                    container = playerContainer,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    *DetailHeroFadeStops
+                                        .map { (position, alpha) -> position to Color.White.copy(alpha = 1f - alpha) }
+                                        .toTypedArray(),
+                                ),
+                                blendMode = BlendMode.DstIn,
+                            )
                         },
-                        onBackdropPic = onPosterPic,
-                        paused = rollPaused,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                ) {
+                    Box(modifier = Modifier.fillMaxSize().layerBackdrop(glassBackdrop)) {
+                        DetailHeroPoster(
+                            vm = vm,
+                            title = title,
+                            altTitle = altTitle,
+                            picture = picture,
+                            year = year,
+                            onImage = { image ->
+                                scope.launch {
+                                    val seed = withContext(Dispatchers.Default) { ImagePalette.seedOf(image) }
+                                    onSeed(seed)
+                                }
+                            },
+                            onBackdropPic = onPosterPic,
+                            paused = rollPaused,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
             CompositionLocalProvider(LocalTopBarGlassBackdrop provides glassBackdrop) {
@@ -351,28 +365,32 @@ internal fun DetailHero(
                     collected = collected,
                     onBack = onBack,
                     onCollect = onCollect,
+                    inlinePlayback = inlinePlayback && playerContainer != null,
+                    onEnterFullscreen = onEnterFullscreen,
                     fallbackColor = circleColor,
                 )
             }
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(
-                        start = HeroContentHorizontalPadding,
-                        end = HeroContentHorizontalPadding,
-                        bottom = HeroLogoBottomPadding,
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                DetailHeroTitle(
-                    vm = vm,
-                    title = title,
-                    altTitle = altTitle,
-                    year = year,
-                    widthFraction = HeroLogoWidthFraction,
-                    color = captionColor,
-                )
+            if (!inlinePlayback) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(
+                            start = HeroContentHorizontalPadding,
+                            end = HeroContentHorizontalPadding,
+                            bottom = HeroLogoBottomPadding,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    DetailHeroTitle(
+                        vm = vm,
+                        title = title,
+                        altTitle = altTitle,
+                        year = year,
+                        widthFraction = HeroLogoWidthFraction,
+                        color = captionColor,
+                    )
+                }
             }
         }
         DetailHeroInfoBlock(
@@ -402,6 +420,8 @@ private fun DetailHeroTopActions(
     collected: Boolean,
     onBack: () -> Unit,
     onCollect: () -> Unit,
+    inlinePlayback: Boolean,
+    onEnterFullscreen: () -> Unit,
     fallbackColor: Color,
 ) {
     Row(
@@ -418,6 +438,15 @@ private fun DetailHeroTopActions(
             fallbackColor = fallbackColor,
         )
         Spacer(Modifier.weight(1f))
+        if (inlinePlayback) {
+            TopBarActionBox(
+                iconRes = R.drawable.ic_detail_fullscreen,
+                contentDescription = stringResource(R.string.detail_fullscreen),
+                onClick = onEnterFullscreen,
+                fallbackColor = fallbackColor,
+            )
+            Spacer(Modifier.size(8.dp))
+        }
         TopBarActionBox(
             iconRes = if (collected) R.drawable.ic_tab_collect_filled else R.drawable.ic_tab_collect,
             contentDescription = stringResource(
@@ -803,6 +832,17 @@ internal fun DetailHeroPoster(
             },
         )
     }
+}
+
+@Composable
+internal fun DetailInlinePlayer(
+    container: PlayContainer,
+    modifier: Modifier = Modifier,
+) {
+    AndroidView(
+        factory = { container },
+        modifier = modifier.background(Color.Black),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)

@@ -102,6 +102,8 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     val exitingFullscreen = _exitingFullscreen.asStateFlow()
     private val _playSignal = MutableStateFlow(0)
     val playSignal = _playSignal.asStateFlow()
+    private val _inlinePlayback = MutableStateFlow(false)
+    val inlinePlayback = _inlinePlayback.asStateFlow()
     private val _collected = MutableStateFlow(false)
     val collected = _collected.asStateFlow()
     private val _follow = MutableStateFlow<VodFollow?>(null)
@@ -545,7 +547,10 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     internal fun applyPlaybackEntry(entry: DetailPlaybackEntry, resumable: Boolean = false) {
         val plan = DetailPlaybackPolicy.plan(entry, resumable)
         if (plan.enterFullScreen) enterFullscreen()
-        if (plan.startPlayback) _playSignal.value += 1
+        if (plan.startPlayback) {
+            _inlinePlayback.value = true
+            _playSignal.value += 1
+        }
     }
 
     private fun enterFullscreen() {
@@ -1050,6 +1055,7 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     }
 
     private fun resetEngineState(keepChips: Boolean) {
+        _inlinePlayback.value = false
         fallbackActive = false
         fallbackAutoSwitch = false
         fallbackKeepCurrentDetail = false

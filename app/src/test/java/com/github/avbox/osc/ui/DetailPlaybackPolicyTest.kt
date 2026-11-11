@@ -10,18 +10,18 @@ class DetailPlaybackPolicyTest {
         DetailPlaybackPolicy.plan(entry, resumable)
 
     @Test
-    fun playCapsuleStartsAndEntersFullScreen() {
+    fun playCapsuleStartsInlinePlayback() {
         val plan = decide(DetailPlaybackEntry.PlayCapsule)
         assertTrue(plan.startPlayback)
-        assertTrue(plan.enterFullScreen)
+        assertFalse(plan.enterFullScreen)
         assertFalse(plan.stopPlayback)
     }
 
     @Test
-    fun episodeEntryStartsAndEntersFullScreen() {
+    fun episodeEntryStartsInlinePlayback() {
         val plan = decide(DetailPlaybackEntry.Episode)
         assertTrue(plan.startPlayback)
-        assertTrue(plan.enterFullScreen)
+        assertFalse(plan.enterFullScreen)
         assertFalse(plan.stopPlayback)
     }
 
@@ -90,16 +90,10 @@ class DetailPlaybackPolicyTest {
     }
 
     @Test
-    fun onlyPlayEntriesEnterFullScreen() {
+    fun playbackEntriesDoNotEnterFullScreenAutomatically() {
         for (entry in DetailPlaybackEntry.entries) {
             val plan = decide(entry, resumable = true)
-            val shouldEnterFullScreen = entry == DetailPlaybackEntry.PlayCapsule ||
-                entry == DetailPlaybackEntry.Episode
-            if (shouldEnterFullScreen) {
-                assertTrue("$entry 应进全屏", plan.enterFullScreen)
-            } else {
-                assertFalse("$entry 不应进全屏", plan.enterFullScreen)
-            }
+            assertFalse("$entry 不应自动进全屏", plan.enterFullScreen)
         }
     }
 
